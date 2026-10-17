@@ -79,7 +79,9 @@ import {
   standardSchemaToJsonSchema,
   validateStandardSchema,
 } from "./standard-schema.js";
-import { z, type ZodLiteral, type ZodObject, type ZodType } from "zod/v4";
+// Import zod as a namespace so bundlers can drop the locales it re-exports.
+import * as z from "zod/v4";
+import type { ZodLiteral, ZodObject, ZodType } from "zod/v4";
 
 type UntypedHandlerSetter = (this: unknown, ...args: unknown[]) => void;
 

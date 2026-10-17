@@ -8,15 +8,19 @@
  *
  * ts-to-zod is a powerful tool but has limitations that require post-processing:
  *
- * ### 1. Zod Import Path (`"zod"` → `"zod/v4"`)
+ * ### 1. Zod Import (`import { z } from "zod"` → `import * as z from "zod/v4"`)
  *
  * ts-to-zod generates `import { z } from "zod"`. We rewrite this to
- * `import { z } from "zod/v4"` because the generated schemas compose with
+ * `import * as z from "zod/v4"` because the generated schemas compose with
  * schemas imported from `@modelcontextprotocol/core`, which the SDK
  * constructs via `zod/v4`. Mixing schemas from the v3 and v4 APIs at runtime
  * fails with errors like `keyValidator._parse is not a function` (v3 internals
  * calling into v4 objects, or vice versa). The `zod/v4` subpath is exported by
  * both zod 3.25+ and zod 4.x, so the peerDependency range is preserved.
+ *
+ * It must be a namespace import: with the named `z` export, esbuild and Bun 1.3
+ * keep all of zod's locales (re-exported as `z.locales`) in every bundle that
+ * includes these schemas.
  *
  * ### 2. External Type References (`z.any()` → actual schemas)
  *
@@ -186,13 +190,14 @@ async function generateJsonSchema() {
  * Post-process generated schemas for project compatibility.
  */
 function postProcess(content: string): string {
-  // 1. Rewrite to zod/v4 and add MCP SDK schema imports.
+  // 1. Rewrite to a zod/v4 namespace import and add MCP SDK schema imports.
   // zod/v4 aligns with the SDK's own zod import — composing v3 and v4
-  // schema instances throws at parse time. See header comment for details.
+  // schema instances throws at parse time — and the namespace import keeps
+  // zod's locales tree-shakable. See header comment for details.
   const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
   content = content.replace(
     'import { z } from "zod";',
-    `import { z } from "zod/v4";
+    `import * as z from "zod/v4";
 import {
   ${mcpImports},
 } from "@modelcontextprotocol/core";`,
@@ -269,7 +274,7 @@ function postProcessTests(content: string): string {
   // Rewrite to zod/v4 so z.infer matches the v4 schemas in schema.ts.
   content = content.replace(
     'import { z } from "zod";',
-    'import { z } from "zod/v4";',
+    'import * as z from "zod/v4";',
   );
 
   content = content.replace(
